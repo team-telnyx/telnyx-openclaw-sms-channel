@@ -1,0 +1,29 @@
+{
+  "name": "telnyx-sms",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.ts",
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "setupEntry": "./setup-entry.ts",
+    "channel": {
+      "id": "telnyx-sms",
+      "label": "Telnyx SMS",
+      "blurb": "Send and receive SMS/MMS via Telnyx."
+    }
+  },
+  "description": "",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "openclaw": "^2026.4.21",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
+  }
+}

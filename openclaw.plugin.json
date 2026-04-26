@@ -1,0 +1,52 @@
+{
+  "id": "telnyx-sms",
+  "kind": "channel",
+  "channels": ["telnyx-sms"],
+  "name": "Telnyx SMS",
+  "description": "Send and receive SMS/MMS via Telnyx Messaging API",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "telnyx-sms": {
+        "type": "object",
+        "properties": {
+          "apiKey": { "type": "string", "description": "Telnyx API key" },
+          "messagingProfileId": { "type": "string", "description": "Default messaging profile ID" },
+          "defaultFromNumber": { "type": "string", "description": "Default phone number to send from" },
+          "allowFrom": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Phone numbers allowed to message the bot"
+          },
+          "dmSecurity": {
+            "type": "string",
+            "enum": ["allowlist", "open"],
+            "default": "allowlist",
+            "description": "DM security policy"
+          },
+          "publicKey": { "type": "string", "description": "Base64 Ed25519 public key for verifying Telnyx webhooks. Copy from https://portal.telnyx.com/#/account/public-key — organization-wide, same key for SMS/Voice/Verify." },
+          "overwriteExistingWebhook": { "type": "boolean", "description": "If the Telnyx profile already has a different webhook URL, overwrite it instead of failing safe. Default: false." },
+          "profileName": { "type": "string", "description": "Name to use when auto-creating a Telnyx messaging profile. Defaults to the agent id." },
+          "autoCreateProfile": { "type": "boolean", "description": "Explicit opt-in: if the Telnyx account has no messaging profile, create one and attach an orphan number. Default false — plugin logs what it would do and waits for you to opt in. Profile creation is visible in your Telnyx dashboard + billing." },
+          "accounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "apiKey": { "type": "string" },
+                "messagingProfileId": { "type": "string" },
+                "defaultFromNumber": { "type": "string" },
+                "allowFrom": { "type": "array", "items": { "type": "string" } },
+                "dmSecurity": { "type": "string", "enum": ["allowlist", "open"] },
+                "publicKey": { "type": "string" }
+              },
+              "required": ["apiKey"]
+            }
+          }
+        },
+        "required": ["apiKey"]
+      }
+    }
+  }
+}
