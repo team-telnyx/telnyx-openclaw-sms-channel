@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { resolveAccount } from "./channel.js";
 import { parseInboundPayload, verifyWebhookSignature } from "./webhook.js";
+import { validateMediaUrl } from "./media-url-policy.js";
 import { TelnyxClient } from "./client.js";
 import type { TelnyxSmsConfig, TelnyxWebhookPayload } from "./types.js";
 
@@ -257,6 +258,31 @@ describe("verifyWebhookSignature", () => {
     const body = '{"data":{"payload":{}}}';
     const ts = String(Math.floor(Date.now() / 1000));
     expect(verifyWebhookSignature(body, "sig", ts, "not-a-key")).toBe(false);
+  });
+});
+
+// ─── TelnyxClient ─────────────────────────────────────────────────
+
+// ─── media URL SSRF policy ───────────────────────────────────────
+
+describe("validateMediaUrl", () => {
+  it("allows HTTPS Telnyx media hosts", () => {
+    expect(validateMediaUrl("https://media.telnyx.com/messages/img.jpg").ok).toBe(true);
+    expect(validateMediaUrl("https://cdn.telnyxcdn.com/messages/img.jpg").ok).toBe(true);
+  });
+
+  it("rejects non-HTTPS URLs", () => {
+    expect(validateMediaUrl("http://media.telnyx.com/messages/img.jpg").ok).toBe(false);
+  });
+
+  it("rejects localhost and private metadata URLs", () => {
+    expect(validateMediaUrl("https://localhost/admin").ok).toBe(false);
+    expect(validateMediaUrl("https://169.254.169.254/latest/meta-data").ok).toBe(false);
+    expect(validateMediaUrl("https://192.168.1.10/file.jpg").ok).toBe(false);
+  });
+
+  it("rejects arbitrary third-party hosts", () => {
+    expect(validateMediaUrl("https://example.com/image.jpg").ok).toBe(false);
   });
 });
 

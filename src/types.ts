@@ -29,7 +29,7 @@ export interface TelnyxMessageResponse {
   data: {
     id: string;
     from: { phone_number: string };
-    to: { phone_number: string };
+    to: { phone_number: string } | Array<{ phone_number: string; status?: string }>;
     text: string;
     media?: Array<{ url: string; content_type: string }>;
   };
@@ -43,10 +43,13 @@ export interface TelnyxWebhookPayload {
     occurred_at?: string;
     payload: {
       from: { phone_number: string };
-      to: { phone_number: string };
+      to: { phone_number: string; status?: string } | Array<{ phone_number: string; status?: string }>;
       text?: string;
-      media?: Array<{ url: string; content_type: string; sha1?: string }>;
+      media?: Array<{ url: string; content_type: string; sha1?: string; sha256?: string; size?: number }>;
       messaging_profile_id?: string;
+      direction?: "inbound" | "outbound";
+      errors?: Array<{ code?: string; title?: string; detail?: string }>;
+      completed_at?: string | null;
       message_id?: string;
       [key: string]: unknown;
     };

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handleTelnyxSmsWebhook, setTelnyxSmsRuntime } from "./inbound.js";
+import { telnyxSmsEventLog } from "./event-log.js";
 import type { TelnyxWebhookPayload } from "./types.js";
 import { EventEmitter } from "node:events";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -86,6 +87,7 @@ describe("handleTelnyxSmsWebhook", () => {
     };
 
     setTelnyxSmsRuntime(mockRuntime);
+    telnyxSmsEventLog.clear();
   });
 
   const validPayload: TelnyxWebhookPayload = {
@@ -130,7 +132,7 @@ describe("handleTelnyxSmsWebhook", () => {
 
   it("acknowledges non-message.received events", async () => {
     const deliveryPayload = { ...validPayload, data: { ...validPayload.data, event_type: "message.delivered" } };
-    const req = createMockReq("POST", {}, deliveryPayload);
+    const req = createMockReq("POST", signedHeader(deliveryPayload), deliveryPayload);
     const res = createMockRes();
     await handleTelnyxSmsWebhook(req, res, baseCfg as any);
     expect(res.statusCode).toBe(200);
@@ -150,11 +152,19 @@ describe("handleTelnyxSmsWebhook", () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it("accepts valid payload with valid signature", async () => {
+  it("accepts valid payload with valid signature and records the event", async () => {
     const req = createMockReq("POST", signedHeader(validPayload), validPayload);
     const res = createMockRes();
     await handleTelnyxSmsWebhook(req, res, baseCfg as any);
     expect(resolveAgentRouteMock).toHaveBeenCalled();
+    expect(telnyxSmsEventLog.recent()).toEqual([
+      expect.objectContaining({
+        direction: "inbound",
+        status: "received",
+        phoneNumber: "+15551234567",
+        messageId: "msg-abc123",
+      }),
+    ]);
   });
 
   it("rejects signed payload with missing from/to phone numbers", async () => {
@@ -164,6 +174,75 @@ describe("handleTelnyxSmsWebhook", () => {
     await handleTelnyxSmsWebhook(req, res, baseCfg as any);
     expect(res.statusCode).toBe(400);
     expect(res.body).toBe("Invalid payload");
+  });
+
+  it("rejects signed payload with unsafe MMS media URL", async () => {
+    const payload: TelnyxWebhookPayload = {
+      data: {
+        event_type: "message.received",
+        payload: {
+          from: { phone_number: "+15551234567" },
+          to: { phone_number: "+15559876543" },
+          text: "image",
+          media: [{ url: "https://169.254.169.254/latest/meta-data", content_type: "image/jpeg" }],
+          message_id: "msg-media",
+          messaging_profile_id: "profile-1",
+        },
+      },
+    };
+    const req = createMockReq("POST", signedHeader(payload), payload);
+    const res = createMockRes();
+    await handleTelnyxSmsWebhook(req, res, baseCfg as any);
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toBe("Invalid media URL");
+    expect(telnyxSmsEventLog.recent()[0]).toEqual(
+      expect.objectContaining({ status: "blocked", reason: expect.stringContaining("blocked MMS media URL") }),
+    );
+  });
+
+  it("records delivery status webhook events", async () => {
+    const payload: TelnyxWebhookPayload = {
+      data: {
+        event_type: "message.finalized",
+        id: "evt-finalized",
+        payload: {
+          from: { phone_number: "+15559876543" },
+          to: [{ phone_number: "+15551234567", status: "delivered" }] as any,
+          text: "reply",
+          message_id: "msg-outbound",
+          messaging_profile_id: "profile-1",
+          errors: [],
+        },
+      },
+    };
+    const req = createMockReq("POST", signedHeader(payload), payload);
+    const res = createMockRes();
+    await handleTelnyxSmsWebhook(req, res, baseCfg as any);
+    expect(res.statusCode).toBe(200);
+    expect(telnyxSmsEventLog.recent()[0]).toEqual(
+      expect.objectContaining({ direction: "outbound", status: "sent", messageId: "msg-outbound" }),
+    );
+  });
+
+  it("rejects oversized MMS media", async () => {
+    const payload: TelnyxWebhookPayload = {
+      data: {
+        event_type: "message.received",
+        payload: {
+          from: { phone_number: "+15551234567" },
+          to: { phone_number: "+15559876543" },
+          text: "big image",
+          media: [{ url: "https://media.telnyx.com/big.jpg", content_type: "image/jpeg", size: 1024 * 1024 + 1 }],
+          message_id: "msg-big-media",
+          messaging_profile_id: "profile-1",
+        },
+      },
+    };
+    const req = createMockReq("POST", signedHeader(payload), payload);
+    const res = createMockRes();
+    await handleTelnyxSmsWebhook(req, res, baseCfg as any);
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toBe("Invalid media size");
   });
 
   it("rejects webhook when publicKey is not configured", async () => {

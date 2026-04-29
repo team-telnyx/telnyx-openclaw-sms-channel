@@ -76,7 +76,7 @@ export function parseInboundPayload(
   from: string;
   to: string;
   text: string | undefined;
-  media: Array<{ url: string; contentType: string }>;
+  media: Array<{ url: string; contentType: string; size?: number }>;
   messageId: string | undefined;
   messagingProfileId: string | undefined;
 } | null {
@@ -94,8 +94,9 @@ export function parseInboundPayload(
     media: (p.media ?? []).map((m) => ({
       url: m.url,
       contentType: m.content_type,
+      size: m.size,
     })),
-    messageId: p.message_id,
+    messageId: p.message_id ?? (p as { id?: string }).id,
     messagingProfileId: p.messaging_profile_id,
   };
 }
