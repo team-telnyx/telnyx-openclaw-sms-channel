@@ -1,7 +1,9 @@
 {
   "id": "telnyx-sms",
   "kind": "channel",
-  "channels": ["telnyx-sms"],
+  "channels": [
+    "telnyx-sms"
+  ],
   "name": "Telnyx SMS",
   "description": "Official Telnyx SMS/MMS channel for OpenClaw with one-key discovery and automatic webhook setup.",
   "channelEnvVars": {
@@ -34,13 +36,18 @@
           },
           "allowFrom": {
             "type": "array",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "default": [],
             "description": "E.164 phone numbers allowed to message the bot when dmSecurity is allowlist."
           },
           "dmSecurity": {
             "type": "string",
-            "enum": ["allowlist", "open"],
+            "enum": [
+              "allowlist",
+              "open"
+            ],
             "default": "allowlist",
             "description": "Inbound and outbound DM security policy. allowlist restricts to allowFrom; open allows any phone number."
           },
@@ -63,11 +70,16 @@
                 "properties": {
                   "provider": {
                     "type": "string",
-                    "enum": ["ngrok", "cloudflared"],
+                    "enum": [
+                      "ngrok",
+                      "cloudflared"
+                    ],
                     "description": "Tunnel provider to launch automatically for development."
                   }
                 },
-                "required": ["provider"]
+                "required": [
+                  "provider"
+                ]
               },
               "tailscale": {
                 "type": "object",
@@ -75,7 +87,9 @@
                 "properties": {
                   "mode": {
                     "type": "string",
-                    "enum": ["funnel"],
+                    "enum": [
+                      "funnel"
+                    ],
                     "description": "Expose via Tailscale Funnel."
                   },
                   "path": {
@@ -83,7 +97,9 @@
                     "description": "Optional Tailscale Funnel path."
                   }
                 },
-                "required": ["mode"]
+                "required": [
+                  "mode"
+                ]
               }
             }
           },
@@ -113,23 +129,106 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "apiKey": { "type": "string" },
-                "messagingProfileId": { "type": "string" },
-                "defaultFromNumber": { "type": "string" },
-                "allowFrom": { "type": "array", "items": { "type": "string" }, "default": [] },
-                "dmSecurity": { "type": "string", "enum": ["allowlist", "open"], "default": "allowlist" },
-                "publicKey": { "type": "string" },
-                "exposure": { "$ref": "#/properties/telnyx-sms/properties/exposure" },
-                "webhookPath": { "type": "string", "default": "/telnyx-sms/webhook" },
-                "overwriteExistingWebhook": { "type": "boolean", "default": false },
-                "profileName": { "type": "string" },
-                "autoCreateProfile": { "type": "boolean", "default": false }
+                "apiKey": {
+                  "type": "string"
+                },
+                "messagingProfileId": {
+                  "type": "string"
+                },
+                "defaultFromNumber": {
+                  "type": "string"
+                },
+                "allowFrom": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": []
+                },
+                "dmSecurity": {
+                  "type": "string",
+                  "enum": [
+                    "allowlist",
+                    "open"
+                  ],
+                  "default": "allowlist"
+                },
+                "publicKey": {
+                  "type": "string"
+                },
+                "exposure": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "description": "How the local OpenClaw gateway is exposed publicly for Telnyx webhooks.",
+                  "properties": {
+                    "publicUrl": {
+                      "type": "string",
+                      "description": "Stable public URL that should receive Telnyx webhooks, for example https://agent.example.com/telnyx-sms/webhook."
+                    },
+                    "tunnel": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "enum": [
+                            "ngrok",
+                            "cloudflared"
+                          ],
+                          "description": "Tunnel provider to launch automatically for development."
+                        }
+                      },
+                      "required": [
+                        "provider"
+                      ]
+                    },
+                    "tailscale": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "funnel"
+                          ],
+                          "description": "Expose via Tailscale Funnel."
+                        },
+                        "path": {
+                          "type": "string",
+                          "description": "Optional Tailscale Funnel path."
+                        }
+                      },
+                      "required": [
+                        "mode"
+                      ]
+                    }
+                  }
+                },
+                "webhookPath": {
+                  "type": "string",
+                  "default": "/telnyx-sms/webhook"
+                },
+                "overwriteExistingWebhook": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "profileName": {
+                  "type": "string"
+                },
+                "autoCreateProfile": {
+                  "type": "boolean",
+                  "default": false
+                }
               },
-              "required": ["apiKey"]
+              "required": [
+                "apiKey"
+              ]
             }
           }
         },
-        "required": ["apiKey"]
+        "required": [
+          "apiKey"
+        ]
       }
     }
   }
