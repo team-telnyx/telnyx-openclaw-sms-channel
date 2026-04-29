@@ -1,26 +1,57 @@
 {
-  "name": "telnyx-sms",
+  "name": "telnyx-openclaw-sms-channel",
   "version": "0.1.0",
+  "description": "Official Telnyx SMS/MMS channel for OpenClaw with one-key discovery and automatic webhook setup.",
   "type": "module",
-  "main": "index.ts",
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "openclaw.plugin.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "prepack": "npm run build"
+  },
   "openclaw": {
     "extensions": [
-      "./index.ts"
+      "./dist/index.js"
     ],
-    "setupEntry": "./setup-entry.ts",
+    "setupEntry": "./dist/setup-entry.js",
     "channel": {
       "id": "telnyx-sms",
       "label": "Telnyx SMS",
       "blurb": "Send and receive SMS/MMS via Telnyx."
+    },
+    "compat": {
+      "pluginApi": "^1.0.0",
+      "minGatewayVersion": "2026.4.21"
+    },
+    "build": {
+      "openclawVersion": "2026.4.21"
     }
   },
-  "description": "",
-  "scripts": {
-    "test": "vitest run"
+  "keywords": [
+    "openclaw",
+    "openclaw-channel",
+    "telnyx",
+    "sms",
+    "mms",
+    "webhook"
+  ],
+  "author": "Telnyx",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/team-telnyx/telnyx-openclaw-sms-channel.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/team-telnyx/telnyx-openclaw-sms-channel/issues"
+  },
+  "homepage": "https://github.com/team-telnyx/telnyx-openclaw-sms-channel#readme",
   "devDependencies": {
     "openclaw": "^2026.4.21",
     "typescript": "^6.0.3",

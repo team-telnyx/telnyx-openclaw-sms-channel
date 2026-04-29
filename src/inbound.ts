@@ -5,6 +5,8 @@ import type { TelnyxWebhookPayload, TelnyxSmsConfig } from "./types.js";
 import { resolveAccount, assertOutboundAllowed } from "./channel.js";
 import { verifyWebhookSignature, parseInboundPayload } from "./webhook.js";
 import { TelnyxClient } from "./client.js";
+import { telnyxSmsEventLog, previewText } from "./event-log.js";
+import { validateMediaUrl } from "./media-url-policy.js";
 
 /** Stored runtime reference — set once during plugin registration. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -81,13 +83,7 @@ export async function handleTelnyxSmsWebhook(
     return;
   }
 
-  // Only handle message.received events
   const eventType = parsed?.data?.event_type;
-  if (eventType && eventType !== "message.received") {
-    res.statusCode = 200;
-    res.end("OK");
-    return;
-  }
 
   // Resolve account and verify webhook signature (ed25519)
   const account = resolveAccount(cfg, null);
@@ -108,6 +104,25 @@ export async function handleTelnyxSmsWebhook(
     return;
   }
 
+  if (eventType === "message.sent" || eventType === "message.finalized") {
+    recordDeliveryStatusEvent(parsed, eventType, cfg);
+    res.statusCode = 200;
+    res.end("OK");
+    return;
+  }
+
+  if (eventType && eventType !== "message.received") {
+    telnyxSmsEventLog.record({
+      direction: "inbound",
+      status: "ignored",
+      reason: `ignored event type: ${eventType}`,
+      messageId: stringOrUndefined(parsed.data?.payload?.message_id ?? parsed.data?.payload?.id),
+    });
+    res.statusCode = 200;
+    res.end("OK");
+    return;
+  }
+
   // Parse the inbound payload
   const inbound = parseInboundPayload(parsed);
   if (!inbound) {
@@ -118,6 +133,54 @@ export async function handleTelnyxSmsWebhook(
 
   // Resolve accountId for multi-account support based on messaging profile
   const accountId = resolveAccountIdForInbound(cfg, inbound.messagingProfileId);
+
+  for (const media of inbound.media) {
+    if (typeof media.size === "number" && media.size > 1024 * 1024) {
+      telnyxSmsEventLog.record({
+        direction: "inbound",
+        status: "blocked",
+        phoneNumber: inbound.from,
+        accountId,
+        messageId: inbound.messageId,
+        preview: previewText(inbound.text),
+        reason: `blocked MMS media larger than 1 MB: ${media.size} bytes`,
+      });
+      res.statusCode = 400;
+      res.end("Invalid media size");
+      return;
+    }
+    const policy = validateMediaUrl(media.url);
+    if (!policy.ok) {
+      telnyxSmsEventLog.record({
+        direction: "inbound",
+        status: "blocked",
+        phoneNumber: inbound.from,
+        accountId,
+        messageId: inbound.messageId,
+        preview: previewText(inbound.text),
+        reason: `blocked MMS media URL: ${policy.reason}`,
+      });
+      res.statusCode = 400;
+      res.end("Invalid media URL");
+      return;
+    }
+  }
+
+  telnyxSmsEventLog.record({
+    direction: "inbound",
+    status: "received",
+    phoneNumber: inbound.from,
+    accountId,
+    messageId: inbound.messageId,
+    preview: previewText(inbound.text),
+    reason: inbound.media.length ? `${inbound.media.length} media attachment(s)` : undefined,
+  });
+
+  // Telnyx expects a 2xx acknowledgement quickly (within ~2 seconds) to avoid
+  // webhook retries. Once the webhook is authenticated and validated, ACK first
+  // and continue dispatching the message into OpenClaw.
+  res.statusCode = 200;
+  res.end("OK");
 
   // Dispatch into OpenClaw via the standard direct-DM pipeline
   try {
@@ -141,7 +204,7 @@ export async function handleTelnyxSmsWebhook(
         assertOutboundAllowed(replyAccount, inbound.from);
 
         const client = new TelnyxClient(replyAccount.apiKey);
-        await client.sendMessage({
+        const result = await client.sendMessage({
           from: replyAccount.defaultFromNumber,
           to: inbound.from,
           text: payload.text ?? "",
@@ -149,11 +212,28 @@ export async function handleTelnyxSmsWebhook(
             ? { messaging_profile_id: replyAccount.messagingProfileId }
             : {}),
         });
+        telnyxSmsEventLog.record({
+          direction: "outbound",
+          status: "sent",
+          phoneNumber: inbound.from,
+          accountId,
+          messageId: result.data.id,
+          preview: previewText(payload.text),
+        });
       },
       onRecordError: (err: unknown) => {
         console.error("[telnyx-sms] session record error:", err);
       },
       onDispatchError: (err: unknown, info: { kind: string }) => {
+        telnyxSmsEventLog.record({
+          direction: "inbound",
+          status: "error",
+          phoneNumber: inbound.from,
+          accountId,
+          messageId: inbound.messageId,
+          preview: previewText(inbound.text),
+          reason: `dispatch error (${info.kind}): ${err instanceof Error ? err.message : String(err)}`,
+        });
         console.error(`[telnyx-sms] dispatch error (${info.kind}):`, err);
       },
     });
@@ -161,10 +241,51 @@ export async function handleTelnyxSmsWebhook(
     res.statusCode = 200;
     res.end("OK");
   } catch (err) {
+    telnyxSmsEventLog.record({
+      direction: "inbound",
+      status: "error",
+      phoneNumber: inbound.from,
+      accountId,
+      messageId: inbound.messageId,
+      preview: previewText(inbound.text),
+      reason: `inbound dispatch error: ${err instanceof Error ? err.message : String(err)}`,
+    });
     console.error("[telnyx-sms] inbound dispatch error:", err);
-    res.statusCode = 500;
-    res.end("Internal error");
   }
+}
+
+function recordDeliveryStatusEvent(
+  parsed: TelnyxWebhookPayload,
+  eventType: "message.sent" | "message.finalized",
+  cfg: OpenClawConfig,
+): void {
+  const payload = parsed.data?.payload;
+  const from = payload?.from?.phone_number;
+  const toField = payload?.to as unknown;
+  const firstTo = Array.isArray(toField)
+    ? (toField[0] as { phone_number?: string; status?: string } | undefined)
+    : (toField as { phone_number?: string; status?: string } | undefined);
+  const status = firstTo?.status;
+  const errors = payload?.errors ?? [];
+  const accountId = resolveAccountIdForInbound(cfg, payload?.messaging_profile_id);
+  const messageId = stringOrUndefined(payload?.message_id ?? payload?.id ?? parsed.data?.id);
+  telnyxSmsEventLog.record({
+    direction: "outbound",
+    status: errors.length ? "error" : eventType === "message.finalized" ? "sent" : "sent",
+    phoneNumber: firstTo?.phone_number ?? from,
+    accountId,
+    messageId,
+    preview: previewText(payload?.text),
+    reason: [
+      eventType,
+      status ? `status=${status}` : undefined,
+      errors.length ? `errors=${errors.map((e) => e.code ?? e.title ?? e.detail ?? "unknown").join(",")}` : undefined,
+    ].filter(Boolean).join(" "),
+  });
+}
+
+function stringOrUndefined(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }
 
 /**

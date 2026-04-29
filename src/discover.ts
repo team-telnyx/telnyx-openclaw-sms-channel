@@ -232,16 +232,34 @@ export async function createProfileAndAttach(
  * Returns the base64 key, or null on failure (caller should log).
  */
 export async function fetchPublicKey(apiKey: string): Promise<string | null> {
-  try {
-    const resp = await fetch("https://api.telnyx.com/v2/public_key", {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    if (!resp.ok) return null;
-    const json = (await resp.json()) as { data?: { public?: string } };
-    return json.data?.public ?? null;
-  } catch {
-    return null;
+  // Boot-time DNS / connection-pool warmup occasionally makes the very first
+  // fetch from Node fail (`fetch failed` with no response code) even when
+  // curl from shell succeeds milliseconds later. Without a key, our handler
+  // 503s every webhook and the self-probe rejects the public URL. Retry a
+  // few times with linear backoff so a single transient blip doesn't put
+  // the whole plugin into degraded mode for the rest of the gateway run.
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const resp = await fetch("https://api.telnyx.com/v2/public_key", {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (resp.ok) {
+        const json = (await resp.json()) as { data?: { public?: string } };
+        const key = json.data?.public ?? null;
+        if (key) return key;
+      }
+      // 4xx/5xx — could be transient (Telnyx 5xx) or permanent (bad key).
+      // Retry anyway; permanent failures will burn through all attempts and
+      // return null, which the caller already handles.
+    } catch {
+      // network-level fetch failure (DNS, TLS, connection reset)
+    }
+    if (attempt < maxAttempts) {
+      await new Promise((r) => setTimeout(r, 1500 * attempt));
+    }
   }
+  return null;
 }
 
 /**

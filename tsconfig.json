@@ -8,7 +8,18 @@
     "skipLibCheck": true,
     "outDir": "dist",
     "rootDir": ".",
-    "declaration": false
+    "declaration": false,
+    "sourceMap": true
   },
-  "include": ["index.ts", "setup-entry.ts", "src/**/*.ts"]
+  "include": [
+    "index.ts",
+    "setup-entry.ts",
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules",
+    "src/**/*.test.ts",
+    "e2e-test.mjs"
+  ]
 }
