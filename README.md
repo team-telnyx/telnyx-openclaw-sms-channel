@@ -1,70 +1,42 @@
+<!-- markdownlint-disable MD013 -->
+
 # Telnyx SMS/MMS Channel for OpenClaw
 
-Official Telnyx SMS plugin for OpenClaw. Give any OpenClaw agent a real Telnyx phone number so people can text the agent directly over SMS/MMS.
+Official Telnyx SMS/MMS channel for OpenClaw. Give an OpenClaw agent a real Telnyx phone number, then let people text it over SMS or MMS.
 
-This package is the Telnyx-owned channel plugin for OpenClaw. It is designed around a one-key Telnyx setup path: paste a Telnyx API key, let the plugin discover the phone number, messaging profile, and webhook public key, then let it configure the messaging profile webhook safely.
+Start with a Telnyx API key and a public webhook URL. The plugin can discover the phone number, Messaging Profile, and webhook public key, then configure the Telnyx webhook safely without replacing another integration unless you explicitly allow it.
 
-## Why this plugin
+## Highlights
 
-- Official Telnyx-maintained OpenClaw SMS/MMS channel.
-- One-key setup path using a Telnyx API v2 key.
-- Auto-discovers the Telnyx phone number, messaging profile, and Ed25519 public key when possible.
-- Automatically registers the OpenClaw webhook route.
-- Can PATCH the Telnyx messaging profile webhook URL for you.
-- Refuses to overwrite an existing third-party webhook unless explicitly allowed.
-- Self-probes the public webhook URL to confirm it reaches this OpenClaw gateway.
-- Runs a watchdog to detect tunnel or Telnyx profile webhook drift.
-- Supports inbound SMS/MMS, outbound SMS/MMS, allowlisted access, and multi-account setups.
-
-## Telnyx-native setup
-
-This plugin is built for the official Telnyx path:
-
-- Start with a single Telnyx API v2 key.
-- Discover the Telnyx number, messaging profile, and webhook public key automatically when possible.
-- Configure the Telnyx Messaging Profile webhook URL from OpenClaw.
-- Protect existing webhook URLs by default.
-- Confirm the public webhook URL reaches this OpenClaw gateway before using it.
-- Watch for tunnel or webhook drift after setup.
-
-## Features
-
-- Inbound SMS through Telnyx Messaging webhooks.
-- Inbound MMS payload parsing and delivery to OpenClaw.
-- Outbound SMS replies through `POST /v2/messages`.
-- Outbound MMS with `media_urls`.
-- Ed25519 webhook signature verification using Telnyx webhook headers.
-- OpenClaw direct-message threading by phone number.
-- Optional pairing via SMS verification code.
-- `allowlist` or `open` DM security mode.
-- Outbound allowlist enforcement so an allowlisted bot cannot accidentally send to unknown numbers.
-- Multi-account config for multiple Telnyx numbers/profiles from one OpenClaw instance.
-- Automatic public key discovery from `GET /v2/public_key`.
-- Automatic number/profile discovery from Telnyx phone-number APIs.
-- Optional messaging profile creation and orphan-number attachment with explicit opt-in.
-- Automatic webhook configuration with safe overwrite protection.
-- Public URL self-probe and periodic webhook watchdog.
-- In-memory status/event log for recent inbound, outbound, blocked, and error events.
-- MMS media URL safety checks to prevent SSRF-style fetch risks.
+- **Official Telnyx channel** — built for Telnyx Messaging and OpenClaw.
+- **Fast setup** — one Telnyx API key is enough for discovery in the common case.
+- **Automatic discovery** — finds the Telnyx number, Messaging Profile, and account webhook public key when possible.
+- **Safe webhook setup** — configures the Messaging Profile webhook only when it can do so safely.
+- **No surprise overwrites** — existing third-party webhook URLs are protected by default.
+- **SMS and MMS** — receive and send text messages and MMS media.
+- **Secure inbound webhooks** — verifies Telnyx Ed25519 signatures before dispatching messages.
+- **Access control** — allowlist mode is the default, with optional open mode.
+- **Production diagnostics** — includes self-probe, watchdog checks, and a recent event log.
+- **Multi-account support** — run multiple Telnyx numbers or profiles from one OpenClaw gateway.
 
 ## Prerequisites
 
-- OpenClaw `2026.4.21` or later.
-- A Telnyx account.
-- A Telnyx API v2 key.
-- A Telnyx phone number with SMS/MMS capability.
-- A publicly reachable webhook URL for inbound SMS/MMS.
-- For US A2P messaging, approved 10DLC brand/campaign setup in Telnyx.
+- OpenClaw `2026.4.21` or later
+- A Telnyx account
+- A Telnyx API v2 key, starts with `KEY...`
+- A Telnyx phone number with SMS/MMS capability
+- A public URL that can reach your OpenClaw gateway
+- For US A2P traffic, approved 10DLC setup where required
 
 ## Install
 
 From ClawHub:
 
 ```sh
-clawhub package install telnyx-openclaw-sms-channel
+openclaw plugins install clawhub:telnyx-openclaw-sms-channel
 ```
 
-From source while developing:
+From source:
 
 ```sh
 git clone https://github.com/team-telnyx/telnyx-openclaw-sms-channel.git
@@ -75,21 +47,23 @@ npm run build
 
 ## Quick start
 
+The happy path is three values: your Telnyx API key, your public webhook URL, and the phone numbers allowed to message the agent.
+
 ### 1. Create a Telnyx API key
 
 In the Telnyx Mission Control Portal:
 
-1. Go to API Keys.
+1. Go to **Account → API Keys**.
 2. Create or copy an API v2 key.
 3. Keep it private. It should start with `KEY...`.
 
-### 2. Make sure you have an SMS-capable Telnyx number
+### 2. Confirm you have an SMS/MMS number
 
-The plugin can discover your number automatically, but the account still needs at least one SMS/MMS-capable number.
+Your Telnyx account needs at least one SMS/MMS-capable phone number.
 
-If the number is already attached to a Messaging Profile, the plugin can reuse that profile. If the number is not attached to a profile, set `autoCreateProfile: true` only when you want the plugin to create a profile and attach the orphan number for you.
+If the number is already assigned to a Messaging Profile, the plugin can reuse that profile. If the number is not assigned to a profile, keep setup manual or set `autoCreateProfile: true` when you intentionally want OpenClaw to create a Messaging Profile and attach the number.
 
-### 3. Configure OpenClaw
+### 3. Add the OpenClaw channel config
 
 Minimal config:
 
@@ -107,35 +81,32 @@ Minimal config:
 }
 ```
 
-With only `apiKey`, the plugin attempts to discover:
+With this config, the plugin attempts to discover:
 
 - `defaultFromNumber`
 - `messagingProfileId`
 - `publicKey`
 
-The `publicKey` is the Telnyx account-wide Ed25519 webhook public key from `GET /v2/public_key`.
+The `publicKey` is the Telnyx account-wide Ed25519 public key used to verify incoming webhooks.
 
 ### 4. Start OpenClaw
 
-When the gateway starts, the plugin:
+On startup, the plugin:
 
 1. Registers the local webhook route, default `/telnyx-sms/webhook`.
 2. Discovers missing Telnyx defaults when possible.
 3. Resolves the public webhook URL.
-4. Self-probes the public URL.
-5. Configures the Telnyx Messaging Profile webhook URL if safe.
+4. Probes the public URL to confirm it reaches this gateway.
+5. Configures the Telnyx Messaging Profile webhook URL when it is safe.
 6. Starts a watchdog for route/profile drift.
-7. Acknowledges validated webhooks quickly with `200 OK` so Telnyx does not retry unnecessarily.
 
 ### 5. Text the Telnyx number
 
-If `dmSecurity` is `allowlist`, the sender must be in `allowFrom`.
+If `dmSecurity` is `allowlist`, only numbers in `allowFrom` can message the agent.
 
 If `dmSecurity` is `open`, anyone who knows the number can message the agent.
 
-## Configuration reference
-
-Full single-account example:
+## Full configuration
 
 ```json
 {
@@ -159,106 +130,45 @@ Full single-account example:
 }
 ```
 
-### `apiKey`
+### Configuration reference
 
-Telnyx API v2 key. Required.
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `apiKey` | string | Yes | — | Telnyx API v2 key. This is the only required field for discovery. |
+| `defaultFromNumber` | string | No | Auto-discovered | E.164 Telnyx number used for outbound SMS/MMS. |
+| `messagingProfileId` | string | No | Auto-discovered | Telnyx Messaging Profile ID. |
+| `publicKey` | string | No | Auto-discovered | Base64 Ed25519 public key for verifying Telnyx webhooks. |
+| `dmSecurity` | string | No | `allowlist` | DM policy: `allowlist` or `open`. |
+| `allowFrom` | string[] | No | `[]` | E.164 phone numbers allowed to message the agent in allowlist mode. |
+| `webhookPath` | string | No | `/telnyx-sms/webhook` | Local OpenClaw route for Telnyx webhooks. |
+| `exposure.publicUrl` | string | Recommended | — | Stable public URL Telnyx should call for webhooks. |
+| `exposure.tunnel.provider` | string | No | — | Development tunnel provider, `ngrok` or `cloudflared`, when supported locally. |
+| `exposure.tailscale.mode` | string | No | — | Tailscale exposure mode, currently `funnel`. |
+| `overwriteExistingWebhook` | boolean | No | `false` | Allows the plugin to replace an existing Messaging Profile webhook URL. |
+| `profileName` | string | No | Derived | Name to use when auto-creating a Messaging Profile. |
+| `autoCreateProfile` | boolean | No | `false` | Allows profile creation and orphan-number attachment when no profile exists. |
+| `accounts` | object | No | — | Named account configs for multiple numbers/profiles. |
 
-### `defaultFromNumber`
+## Automatic setup behavior
 
-E.164 Telnyx number used for outbound SMS/MMS. Optional when discovery can find a number.
+This plugin is designed to remove most manual Telnyx Portal setup.
 
-### `messagingProfileId`
+When possible, it will:
 
-Telnyx Messaging Profile ID. Optional when discovery can find the profile attached to `defaultFromNumber`.
+- Find an SMS/MMS-capable Telnyx phone number.
+- Find the Messaging Profile attached to that number.
+- Fetch the account webhook public key.
+- Register the OpenClaw webhook route.
+- Confirm your public URL reaches the local gateway.
+- Configure the Messaging Profile webhook URL.
 
-### `publicKey`
+The safety rule is simple: the plugin will not silently replace another webhook. If a Messaging Profile already points to a different URL, setup fails safe unless `overwriteExistingWebhook` is `true`.
 
-Base64 Ed25519 public key used to verify Telnyx webhooks. Optional when discovery can fetch it from `GET /v2/public_key`.
-
-### `dmSecurity`
-
-Inbound/outbound DM security policy.
-
-Allowed values:
-
-- `allowlist`, default. Only numbers in `allowFrom` can message the bot. Outbound sends are also restricted to `allowFrom`.
-- `open`. Any phone number can message the bot.
-
-### `allowFrom`
-
-Phone numbers allowed to message the bot when `dmSecurity` is `allowlist`.
-
-```json
-"allowFrom": ["+15551234567", "+15557654321"]
-```
-
-### `webhookPath`
-
-Local OpenClaw route for Telnyx webhooks.
-
-Default:
-
-```json
-"/telnyx-sms/webhook"
-```
-
-### `exposure.publicUrl`
-
-Stable public URL that Telnyx should call.
-
-```json
-{
-  "exposure": {
-    "publicUrl": "https://agent.example.com/telnyx-sms/webhook"
-  }
-}
-```
-
-### `exposure.tunnel`
-
-Development tunnel option when supported by the local machine.
-
-```json
-{
-  "exposure": {
-    "tunnel": { "provider": "cloudflared" }
-  }
-}
-```
-
-or:
-
-```json
-{
-  "exposure": {
-    "tunnel": { "provider": "ngrok" }
-  }
-}
-```
-
-### `overwriteExistingWebhook`
-
-Default: `false`.
-
-When false, the plugin refuses to overwrite a Telnyx Messaging Profile webhook URL that points somewhere else. This protects existing Zapier, production, or customer integrations.
-
-Set to `true` only when you intentionally want this OpenClaw gateway to own the profile webhook.
-
-### `profileName`
-
-Name to use when auto-creating a Messaging Profile.
-
-Default is derived from OpenClaw agent or instance metadata.
-
-### `autoCreateProfile`
-
-Default: `false`.
-
-When true, the plugin may create a Messaging Profile and attach an orphan Telnyx number if no profile exists. This is explicit opt-in because profile/number changes are visible in the Telnyx dashboard and may affect billing or routing.
+Use a dedicated Messaging Profile and number when you do not want OpenClaw to touch an existing production integration.
 
 ## Multi-account setup
 
-Use `accounts` when one OpenClaw instance should serve multiple Telnyx numbers/profiles.
+Use `accounts` when one OpenClaw instance should serve multiple Telnyx numbers or profiles.
 
 ```json
 {
@@ -285,41 +195,7 @@ Use `accounts` when one OpenClaw instance should serve multiple Telnyx numbers/p
 }
 ```
 
-## Architecture
-
-The plugin has four main parts:
-
-1. **OpenClaw channel plugin**
-   - Registers the `telnyx-sms` channel with OpenClaw.
-   - Handles outbound delivery for SMS/MMS.
-   - Exposes channel capabilities, setup flow, pairing, and account resolution.
-
-2. **Telnyx Messaging API client**
-   - Sends SMS/MMS through `POST https://api.telnyx.com/v2/messages`.
-   - Uses the configured or discovered Telnyx phone number as `from`.
-   - Includes `messaging_profile_id` when available.
-   - Adds `media_urls` for MMS delivery.
-
-3. **Inbound webhook handler**
-   - Registers an HTTP route in the OpenClaw gateway.
-   - Default route: `/telnyx-sms/webhook`.
-   - Reads the raw request body.
-   - Verifies Telnyx Ed25519 webhook signatures.
-   - Parses inbound SMS/MMS payloads.
-   - Dispatches messages into OpenClaw as direct conversations.
-
-4. **Setup and watchdog layer**
-   - Discovers phone number, messaging profile, and webhook public key from Telnyx.
-   - Resolves the public webhook URL.
-   - Optionally configures the Telnyx Messaging Profile webhook URL.
-   - Self-probes the public URL to confirm traffic reaches this gateway.
-   - Re-checks routing/profile state periodically and logs drift.
-
-5. **Diagnostics and media-safety layer**
-   - Keeps a bounded in-memory event log of recent SMS activity.
-   - Records inbound receives, outbound sends, blocked media, and dispatch errors.
-   - Validates inbound MMS media URLs before allowing them into the message pipeline.
-   - Rejects localhost, private IPs, metadata-service IPs, non-HTTPS URLs, and non-Telnyx media hosts.
+## Message flow
 
 ```text
 User phone
@@ -332,168 +208,39 @@ OpenClaw gateway /telnyx-sms/webhook
    │ verified + normalized
    ▼
 OpenClaw telnyx-sms channel
-   │ direct-message thread
+   │ direct message thread
    ▼
-Agent
-   │ reply
+Agent response
+   │ outbound SMS/MMS
    ▼
-Telnyx Messaging API /v2/messages
-   │ SMS/MMS
-   ▼
-User phone
+Telnyx Messaging API
 ```
 
-## How it works
+Inbound flow:
 
-### Startup lifecycle
+1. A user texts your Telnyx number.
+2. Telnyx sends a `message.received` webhook to OpenClaw.
+3. The plugin verifies the Ed25519 signature.
+4. The sender is checked against `dmSecurity` and `allowFrom`.
+5. SMS text and safe MMS media are normalized into an OpenClaw direct message.
+6. The agent replies through Telnyx SMS/MMS.
 
-When OpenClaw starts, the plugin:
+Outbound flow:
 
-1. Reads `channels.telnyx-sms` from OpenClaw config.
-2. Registers the local webhook route synchronously so OpenClaw can receive inbound webhooks immediately.
-3. Attempts to discover missing Telnyx defaults:
-   - `defaultFromNumber`
-   - `messagingProfileId`
-   - `publicKey`
-4. Resolves the public webhook URL from `exposure.publicUrl`, a configured tunnel, or another supported exposure mode.
-5. Sends a self-probe to the public URL and expects the local handler to reject it with `401`, proving the public URL reaches this gateway.
-6. Fetches the Telnyx Messaging Profile.
-7. Configures or verifies the profile `webhook_url`.
-8. Starts the watchdog.
-
-### Inbound message flow
-
-1. A user texts the Telnyx number.
-2. Telnyx sends a webhook event to the configured Messaging Profile webhook URL.
-3. The plugin verifies the `telnyx-signature-ed25519` and `telnyx-timestamp` headers.
-4. The plugin validates any MMS media metadata.
-5. The plugin acknowledges the webhook with `200 OK` after validation, then dispatches into OpenClaw.
-6. The plugin parses the payload into OpenClaw's direct-message shape.
-7. The sender phone number becomes the conversation identity.
-8. OpenClaw routes the message to the agent.
-9. If the agent replies, the plugin sends the response through the Telnyx Messaging API.
-
-### Outbound message flow
-
-1. OpenClaw asks the `telnyx-sms` channel to send a message.
-2. The plugin resolves the configured account.
-3. In `allowlist` mode, the plugin verifies the destination is allowed.
-4. The plugin sends the message with `POST /v2/messages`.
-5. If media is included, the plugin sends MMS using `media_urls`.
-6. The Telnyx API returns the message ID, which OpenClaw records as the delivery result.
-7. If Telnyx later sends `message.sent` or `message.finalized` webhooks, the plugin records them in the event log for delivery troubleshooting.
-
-### Session routing
-
-The plugin treats each phone number as a direct-message conversation.
-
-- Sender phone number maps to the OpenClaw conversation identity.
-- Replies go back to the same phone number.
-- Multi-account setups can route through different configured Telnyx accounts/profiles.
-
-### Status/event log
-
-The plugin keeps a small in-memory ring buffer of recent SMS activity. It records events such as:
-
-- inbound SMS/MMS received
-- outbound SMS sent
-- Telnyx delivery status webhooks, including `message.sent` and `message.finalized`
-- blocked inbound media URL
-- oversized inbound MMS media
-- dispatch or delivery errors
-- Telnyx message ID when available
-- account ID, sender/recipient phone number, and a short text preview
-
-The log is intended for operator debugging and supportability. It is intentionally bounded and in-memory, so it does not persist message history to disk.
-
-### MMS media URL safety
-
-Inbound MMS webhooks can include media URLs. Before those URLs are allowed into the message pipeline, the plugin validates them as untrusted input.
-
-The policy requires:
-
-- HTTPS only
-- no embedded credentials
-- no localhost
-- no private or reserved IP addresses
-- no cloud metadata-service IPs such as `169.254.169.254`
-- host must be an allowed Telnyx media/CDN host
-- inbound MMS media size must be 1 MB or smaller when Telnyx includes size metadata
-
-This protects the gateway from SSRF-style risks where a crafted media URL could otherwise cause the server to access internal services.
-
-### Webhook setup behavior
-
-Telnyx sends inbound SMS/MMS events to the Messaging Profile webhook URL.
-
-This plugin can configure that URL automatically:
-
-1. Fetch the selected Messaging Profile.
-2. Check the existing `webhook_url`.
-3. If empty, set it to this OpenClaw gateway's public URL.
-4. If it already points to this gateway or a stale dev tunnel owned by this setup, update it.
-5. If it points somewhere else, skip safely unless `overwriteExistingWebhook` is true.
-6. Verify the stored webhook URL after PATCH.
-
-This avoids the common setup failure mode: OpenClaw is running, SMS sends work, but inbound messages disappear because the Telnyx profile webhook points at the wrong place.
-
-## Telnyx messaging notes
-
-### Webhook retries and failover
-
-Telnyx expects webhook receivers to return a `2xx` response quickly. If a webhook endpoint does not respond in time or returns an error, Telnyx may retry delivery and then use a configured failover URL if one exists.
-
-This plugin validates the webhook signature and payload first, then acknowledges valid webhook events quickly to avoid unnecessary retries while the agent work continues asynchronously.
-
-### Delivery status and MDRs
-
-Telnyx sends outbound status events such as `message.sent` and `message.finalized`. The plugin records those in the event log for troubleshooting.
-
-For deeper troubleshooting, use the Telnyx message ID with Message Detail Records in the Telnyx API or portal. MDRs can show status, cost, parts, errors, and delivery failure details.
-
-### Opt-out keywords
-
-Telnyx handles standard English opt-out and opt-in keywords at the messaging profile level.
-
-Common opt-out keywords include:
-
-- `STOP`
-- `STOPALL`
-- `UNSUBSCRIBE`
-- `CANCEL`
-- `END`
-- `QUIT`
-
-Common opt-in keywords include:
-
-- `START`
-- `UNSTOP`
-
-Opt-out words must generally be sent as the only words in the message. Once a recipient opts out, messages from numbers on the same messaging profile to that recipient may be blocked until they opt back in.
-
-### MMS file types and size
-
-Common MMS media types include:
-
-- `text/plain`
-- `text/vcard`
-- `image/jpeg`
-- `image/png`
-- `image/gif`
-- `video/3gpp`
-- `video/mp4`
-
-Carrier MMS size limits vary. This plugin uses a conservative 1 MB inbound media size guard when Telnyx includes media size metadata.
+1. OpenClaw sends a message through the `telnyx-sms` channel.
+2. The plugin selects the configured or discovered Telnyx number.
+3. In allowlist mode, the recipient must be in `allowFrom`.
+4. The message is sent through Telnyx `POST /v2/messages`.
 
 ## Security model
 
 - Webhooks are verified with Telnyx Ed25519 signatures.
-- Inbound webhook requests without a configured/discovered public key are rejected.
+- Webhook requests without a configured or discovered public key are rejected.
 - `allowlist` is the default DM security mode.
 - Outbound sends honor `allowFrom` in allowlist mode.
 - Existing foreign profile webhooks are protected by default.
 - MMS media URLs are validated before use to reduce SSRF risk.
-- API keys should be stored in OpenClaw config/secrets, not committed to source control.
+- API keys should live in OpenClaw config or secrets, never in source control.
 
 ## Troubleshooting
 
@@ -505,16 +252,17 @@ Check:
 - The Telnyx Messaging Profile webhook URL points to your public URL.
 - The public URL routes to the OpenClaw gateway.
 - The route path matches `webhookPath`, default `/telnyx-sms/webhook`.
-- The plugin logs show a successful self-probe.
+- Startup logs show a successful public URL self-probe.
 - The Telnyx public key was discovered or configured.
+- The sender is allowed by `dmSecurity` and `allowFrom`.
 
 ### Webhook signature errors
 
 Check:
 
 - `publicKey` is the Telnyx account-wide Ed25519 public key.
-- The request body is not being modified by a proxy before reaching OpenClaw.
-- You are not using a public key from a different Telnyx account.
+- The request body is not modified by a proxy before reaching OpenClaw.
+- The public key belongs to the same Telnyx account that sends the webhook.
 
 ### Outbound sends fail
 
@@ -526,27 +274,21 @@ Check:
 - The recipient is in `allowFrom` when `dmSecurity` is `allowlist`.
 - US A2P traffic has approved 10DLC registration where required.
 
-### The plugin skipped webhook configuration
+### Webhook configuration was skipped
 
 If logs mention an existing foreign webhook, the plugin is protecting another integration.
 
 Options:
 
 1. Manually update the Telnyx Messaging Profile webhook in the portal.
-2. Use a separate Messaging Profile/number for OpenClaw.
-3. Set `overwriteExistingWebhook: true` only if you intentionally want OpenClaw to replace the existing webhook.
+2. Use a separate Messaging Profile and number for OpenClaw.
+3. Set `overwriteExistingWebhook: true` only when you intentionally want OpenClaw to replace the existing webhook.
 
-## Support
+### MMS media is blocked
 
-If you have issues with this plugin, contact Telnyx Support at support@telnyx.com.
+The plugin blocks risky media URLs before passing MMS attachments to OpenClaw.
 
-When reaching out, include:
-
-- OpenClaw version.
-- Plugin version.
-- Whether you are using `publicUrl`, `cloudflared`, `ngrok`, or another exposure method.
-- The Telnyx Messaging Profile ID, if available.
-- Relevant OpenClaw gateway logs with API keys and phone numbers redacted.
+Check that the media URL is HTTPS, belongs to an expected Telnyx media host, and is not a private, localhost, or metadata-service address.
 
 ## Development
 
@@ -564,6 +306,20 @@ npm pack --dry-run
 - OpenClaw channel id: `telnyx-sms`
 - Source repo: `https://github.com/team-telnyx/telnyx-openclaw-sms-channel`
 - Maintainer: Telnyx
+
+## Support
+
+For plugin bugs, open an issue in the source repository.
+
+For Telnyx account, phone number, campaign, or Messaging API issues, contact Telnyx Support.
+
+When asking for help, include:
+
+- OpenClaw version
+- Plugin version
+- Exposure method, for example `publicUrl`, `cloudflared`, `ngrok`, or Tailscale Funnel
+- Telnyx Messaging Profile ID, if available
+- Relevant OpenClaw gateway logs with API keys and phone numbers redacted
 
 ## License
 
