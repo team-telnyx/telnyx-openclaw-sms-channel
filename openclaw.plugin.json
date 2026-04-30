@@ -1,5 +1,5 @@
 {
-  "id": "telnyx-sms",
+  "id": "telnyx-openclaw-sms-channel",
   "kind": "channel",
   "channels": [
     "telnyx-sms"

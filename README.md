@@ -303,6 +303,7 @@ npm pack --dry-run
 ## Package identity
 
 - ClawHub package: `telnyx-openclaw-sms-channel`
+- Plugin id: `telnyx-openclaw-sms-channel`
 - OpenClaw channel id: `telnyx-sms`
 - Source repo: `https://github.com/team-telnyx/telnyx-openclaw-sms-channel`
 - Maintainer: Telnyx
