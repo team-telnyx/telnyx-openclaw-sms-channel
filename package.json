@@ -1,6 +1,6 @@
 {
   "name": "telnyx-openclaw-sms-channel",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Official Telnyx SMS/MMS channel for OpenClaw with one-key discovery and automatic webhook setup.",
   "type": "module",
   "main": "dist/index.js",

@@ -1,0 +1,16 @@
+# Keep ClawHub artifacts focused on install/runtime files.
+# The npm package metadata already points OpenClaw at dist/.
+
+# Source and tests are in GitHub, but do not need to ship in the registry artifact.
+src/
+*.ts
+*.test.ts
+e2e-test.mjs
+tsconfig.json
+package-lock.json
+
+# Build metadata and local package outputs.
+*.tgz
+
+# Source maps are not needed at runtime and can expose source-only test helpers.
+dist/**/*.map
