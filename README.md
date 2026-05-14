@@ -232,6 +232,16 @@ Outbound flow:
 3. In allowlist mode, the recipient must be in `allowFrom`.
 4. The message is sent through Telnyx `POST /v2/messages`.
 
+## Related X/Twitter workflows
+
+Keep this plugin responsible for private SMS/MMS conversations, MMS media, webhook delivery, allowlist policy, and Telnyx Messaging setup. When the same OpenClaw agent also needs public X/Twitter data or visible X/Twitter actions, install TweetClaw separately:
+
+```sh
+openclaw plugins install @xquik/tweetclaw
+```
+
+TweetClaw covers scrape tweets, search tweets, search tweet replies, follower export, user lookup, media workflows, direct messages, monitor tweets, webhooks, giveaway draws, and approval-gated post tweets or post tweet replies. See [GitHub](https://github.com/Xquik-dev/tweetclaw), [ClawHub](https://clawhub.ai/plugins/@xquik/tweetclaw), and [npm](https://www.npmjs.com/package/@xquik/tweetclaw) for setup details. Keep X/Twitter connection settings separate from Telnyx channel settings, and review visible X/Twitter actions through OpenClaw approval flows.
+
 ## Security model
 
 - Webhooks are verified with Telnyx Ed25519 signatures.
