@@ -240,7 +240,7 @@ Keep this plugin responsible for private SMS/MMS conversations, MMS media, webho
 openclaw plugins install @xquik/tweetclaw
 ```
 
-TweetClaw covers scrape tweets, search tweets, search tweet replies, follower export, user lookup, media workflows, direct messages, monitor tweets, webhooks, giveaway draws, and approval-gated post tweets or post tweet replies. See [GitHub](https://github.com/Xquik-dev/tweetclaw), [ClawHub](https://clawhub.ai/plugins/@xquik/tweetclaw), and [npm](https://www.npmjs.com/package/@xquik/tweetclaw) for setup details. Keep X/Twitter connection settings separate from Telnyx channel settings, and review visible X/Twitter actions through OpenClaw approval flows.
+TweetClaw covers scrape tweets, search tweets, search tweet replies, follower export, user lookup, media workflows, direct messages, monitor tweets, webhooks, giveaway draws, and approval-gated post tweets or post tweet replies. Use [GitHub](https://github.com/Xquik-dev/tweetclaw) and [npm](https://www.npmjs.com/package/@xquik/tweetclaw) for setup details; the [ClawHub discovery page](https://clawhub.ai/plugins/@xquik/tweetclaw) is useful for browsing while its listing lags behind the npm release. Keep X/Twitter connection settings separate from Telnyx channel settings, and review visible X/Twitter actions through OpenClaw approval flows.
 
 ## Security model
 
