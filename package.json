@@ -27,7 +27,7 @@
       "blurb": "Send and receive SMS/MMS via Telnyx."
     },
     "compat": {
-      "pluginApi": "^1.0.0",
+      "pluginApi": "2026.4",
       "minGatewayVersion": "2026.4.21"
     },
     "build": {
@@ -53,6 +53,7 @@
   },
   "homepage": "https://github.com/team-telnyx/telnyx-openclaw-sms-channel#readme",
   "devDependencies": {
+    "@types/node": "^25.9.1",
     "openclaw": "^2026.4.21",
     "typescript": "^6.0.3",
     "vitest": "^4.1.5"
