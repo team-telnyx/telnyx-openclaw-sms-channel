@@ -198,8 +198,13 @@ catch (e) { bad("wildcard bypass", e.message); }
 try { assertOutboundAllowed({ ...baseAcct, allowFrom: [] }, "+15555550123"); ok("empty allowFrom → unrestricted"); }
 catch (e) { bad("empty allowFrom", e.message); }
 
-// Normalization: +1 (773) 302-2477 vs +17733022477
-try { assertOutboundAllowed(baseAcct, "+1 (773) 302-2477"); ok("formatted number normalized"); }
+// Normalization: +1NXXNXXXXXX and +1 (NXX) NXX-XXXX should match.
+const normalizationTarget = allowFrom[0];
+const formattedTarget =
+  normalizationTarget && /^\+1\d{10}$/.test(normalizationTarget)
+    ? `+1 (${normalizationTarget.slice(2, 5)}) ${normalizationTarget.slice(5, 8)}-${normalizationTarget.slice(8)}`
+    : normalizationTarget;
+try { assertOutboundAllowed(baseAcct, formattedTarget); ok("formatted number normalized"); }
 catch (e) { bad("normalization", e.message); }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -288,12 +293,27 @@ const webhookCfg = { channels: { "telnyx-sms": { apiKey: "k", defaultFromNumber:
   else bad("bad JSON", `${res.statusCode} ${res.body}`);
 }
 
-// 9c: non-message.received → 200 ignored
+// 9c: unsigned non-message events are still rejected before event filtering.
 {
   const payload = { data: { event_type: "message.delivered", payload: { from: { phone_number: "+1" }, to: { phone_number: "+2" } } } };
   const res = mockRes();
   await handleTelnyxSmsWebhook(mockReq("POST", {}, payload), res, webhookCfg);
-  if (res.statusCode === 200) ok("non-message.received → 200 ignored"); else bad("non-msg event", res.statusCode);
+  if (res.statusCode === 401) ok("unsigned non-message event → 401"); else bad("unsigned non-msg event", res.statusCode);
+}
+
+// 9c.1: signed non-message.received → 200 ignored
+{
+  const payload = { data: { event_type: "message.delivered", payload: { from: { phone_number: "+1" }, to: { phone_number: "+2" } } } };
+  const raw = JSON.stringify(payload);
+  const ts = String(Math.floor(Date.now() / 1000));
+  const sig = wireKP.sign(raw, ts);
+  const res = mockRes();
+  await handleTelnyxSmsWebhook(
+    mockReq("POST", { "telnyx-signature-ed25519": sig, "telnyx-timestamp": ts }, raw),
+    res,
+    webhookCfg,
+  );
+  if (res.statusCode === 200) ok("signed non-message.received → 200 ignored"); else bad("signed non-msg event", res.statusCode);
 }
 
 // 9d: valid payload + VALID signature → dispatched
