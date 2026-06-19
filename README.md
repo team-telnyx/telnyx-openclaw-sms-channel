@@ -6,6 +6,12 @@ Official Telnyx SMS/MMS channel for OpenClaw. Give an OpenClaw agent a real Teln
 
 Start with a Telnyx API key and a public webhook URL. The plugin can discover the phone number, Messaging Profile, and webhook public key, then configure the Telnyx webhook safely without replacing another integration unless you explicitly allow it.
 
+## Setup Walkthrough
+
+Watch the full setup walkthrough:
+
+[![OpenClaw SMS/MMS setup walkthrough](docs/assets/openclaw-sms-mms-setup-walkthrough.png)](docs/assets/openclaw-sms-mms-setup-walkthrough.mp4)
+
 ## Highlights
 
 - **Official Telnyx channel** — built for Telnyx Messaging and OpenClaw.
